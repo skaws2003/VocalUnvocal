@@ -11,7 +11,7 @@ class VocalData(torch.utils.data.Dataset):
     """
     A pytorch dataset class for vocal dataset.
     """
-    def __init__(self,root,max_length=20000):
+    def __init__(self,root,max_length=2000):
         """
         :param root: directory to the dataset.
         :param length: length of mfcc features to look at
@@ -42,19 +42,23 @@ class VocalData(torch.utils.data.Dataset):
             to_append = np.zeros((self.max_length - file.shape[0],file.shape[1]))
             file_len = file.shape[0]
             file = np.concatenate([file,to_append],axis=0)
+        file = file.astype(np.float32)
         return file, label, file_len
 
 
 def get_vocaldata(root,length):
     """
-    get the Vocaldata dataset.
+    get the Vocaldata datasets.
     :param root: directory to the dataset
+    :return: train, val dataloader
     """
-    return VocalData(root,length)
+    train_loader = VocalData(root=os.path.join(root,'train'),max_length=length)
+    val_loader = VocalData(root=os.path.join(root,'val'),max_length=length)
+    return train_loader,val_loader
 
 
 def test():
-    ds = VocalData(root= '/media/skaws2003/HDD/datasets/VOCALS')
+    ds = VocalData(root= '/media/skaws2003/HDD/datasets/VOCALS/train')
     dl = torch.utils.data.DataLoader(dataset=ds,batch_size=2,shuffle=True,num_workers=0)
     it = iter(dl)
     for i in range(5):
