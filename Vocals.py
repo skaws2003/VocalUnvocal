@@ -55,8 +55,15 @@ def train(model,optimizer,train_loader,val_loader,criterion,epochs):
             # backward path
             loss.backward()
             optimizer.step()
+
+            # Accuracy
+            batch_pred = np.argmax(result.detach().cpu().numpy(),axis=1)
+            accu = np.mean(batch_pred == target.detach().cpu().numpy())
+            acc_list.append(accu.item())
             if i % 50 == 0:
                 print("%d/%d"%(i,len(train_loader)))
+                
+        print("Training done. Training acc: %lf"%(np.mean(acc_list)))
 
         # model update
         epoch_loss = np.mean(losses)
@@ -95,7 +102,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=args.init_lr)
     train_set, val_set = get_vocaldata(root=args.data_root, length=args.max_length)
     if args.debug:
-        train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
+        train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=args.batch_size, shuffle=True, num_workers=0)
         val_loader = torch.utils.data.DataLoader(dataset=val_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
     else:
         train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=args.batch_size, shuffle=True, num_workers=4)
