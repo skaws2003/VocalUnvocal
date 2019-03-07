@@ -4,7 +4,7 @@ import torchvision
 import os
 import argparse
 from vocal_data import get_vocaldata
-from vocal_unvocal_net import VocalUnvocalNet
+from models.vocal_unvocal_net import VocalUnvocalNet
 import numpy as np
 
 # Argument parser settings
