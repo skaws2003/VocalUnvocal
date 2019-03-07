@@ -1,4 +1,5 @@
 import torch
+from torch.optim import lr_scheduler
 import torchvision
 import os
 import argparse
@@ -31,7 +32,7 @@ args = parser.parse_args()
 device = torch.device('cuda:' + str(args.cuda)) if torch.cuda.is_available() else torch.device('cpu')
 
 
-def train(model,optimizer,train_loader,val_loader,criterion,epochs):
+def train(model,optimizer,scheduler,train_loader,val_loader,criterion,epochs):
 
     epoch_losses_train = []
     epoch_losses_eval = []
@@ -42,7 +43,7 @@ def train(model,optimizer,train_loader,val_loader,criterion,epochs):
         # Train
         model.train()
         losses = []
-        acc_list = []
+        acc_list_train = []
         for i,(data,target,lengths) in enumerate(train_loader):
             # forward path
             optimizer.zero_grad()
@@ -59,11 +60,11 @@ def train(model,optimizer,train_loader,val_loader,criterion,epochs):
             # Accuracy
             batch_pred = np.argmax(result.detach().cpu().numpy(),axis=1)
             accu = np.mean(batch_pred == target.detach().cpu().numpy())
-            acc_list.append(accu.item())
+            acc_list_train.append(accu.item())
             if i % 50 == 0:
                 print("%d/%d"%(i,len(train_loader)))
                 
-        print("Training done. Training acc: %lf"%(np.mean(acc_list)))
+        print("Training done. Training acc: %lf"%(np.mean(acc_list_train)))
 
         # model update
         epoch_loss = np.mean(losses)
@@ -80,6 +81,8 @@ def train(model,optimizer,train_loader,val_loader,criterion,epochs):
         # Eval
         model.eval()
         losses = []
+        total_num = 0
+        total_acc = 0
         with torch.no_grad():
             for i,(data,target,lengths) in enumerate(val_loader):
                 data = data.to(device)
@@ -88,8 +91,15 @@ def train(model,optimizer,train_loader,val_loader,criterion,epochs):
                 result = model(data,lengths)
                 loss = criterion(result,target)
                 losses.append(loss.item())
+                # accu
+                batch_pred = np.argmax(result.detach().cpu().numpy(),axis=1)
+                accu = (batch_pred == target.detach().cpu().numpy())
+                total_num += len(target)
+                total_acc += sum(accu)
             epoch_loss = np.mean(losses)
+            scheduler.step(epoch_loss)
             print("EPOCH %d: validation loss = %.05f"%(epoch,epoch_loss))
+            print("Validation accuracy = %.05f"%(total_acc/total_num))
             epoch_losses_eval.append(epoch_loss)
 
     # Load best model
@@ -100,6 +110,7 @@ def main():
     # Load models, dataset, dataloaders
     model = VocalUnvocalNet(input_size=13, hidden_size=args.hidden_size, n_layers=args.num_layers, dropout=args.dropout).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.init_lr)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,factor=0.33,patience=8)
     train_set, val_set = get_vocaldata(root=args.data_root, length=args.max_length)
     if args.debug:
         train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=args.batch_size, shuffle=True, num_workers=0)
@@ -110,7 +121,7 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
 
     # Now train!
-    train(model,optimizer,train_loader,val_loader,criterion,args.epochs)
+    train(model,optimizer,scheduler,train_loader,val_loader,criterion,args.epochs)
 
 
 if __name__=='__main__':
